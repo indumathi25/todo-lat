@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_DB=todo_db
+      - POSTGRES_USER=todo_user
+      - POSTGRES_PASSWORD=todo_password
+    ports:
+      - "5432:5432"
+
+  backend:
+    image: todo-backend:${TAG:-latest}
+    build: ./backend
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - SECRET_KEY=dev_secret_key
+      - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+      - DATABASE_URL=postgres://todo_user:todo_password@db:5432/todo_db
+      - AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+      - AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
+    depends_on:
+      - db
+
+  frontend:
+    image: todo-frontend:${TAG:-latest}
+    build: ./frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_AUTH0_DOMAIN=${AUTH0_DOMAIN}
+      - VITE_AUTH0_CLIENT_ID=${AUTH0_CLIENT_ID}
+      - VITE_AUTH0_AUDIENCE=${AUTH0_AUDIENCE}
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

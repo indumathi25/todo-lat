@@ -1,0 +1,10 @@
+Django>=4.2,<5.0
+djangorestframework
+psycopg2-binary
+django-cors-headers
+python-dotenv
+auth0-python
+PyJWT
+requests
+cryptography
+dj-database-url
