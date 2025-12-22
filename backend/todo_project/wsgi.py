@@ -8,9 +8,11 @@ https://docs.djangoproject.com/en/4.2/howto/deployment/wsgi/
 """
 
 import os
-
 from django.core.wsgi import get_wsgi_application
+from .otel import setup_opentelemetry
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'todo_project.settings')
+
+setup_opentelemetry()
 
 application = get_wsgi_application()
