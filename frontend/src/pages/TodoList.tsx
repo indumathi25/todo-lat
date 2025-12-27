@@ -1,96 +1,31 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth0 } from '@auth0/auth0-react';
-import api from '../api';
 import LogoutButton from '../components/LogoutButton';
-
-interface TodoType {
-    id: number;
-    name: string;
-    description: string;
-}
-
-interface Todo {
-    id: number;
-    title: string;
-    description: string;
-    completed: boolean;
-    todo_type: TodoType | null;
-}
+import { useTodos, useTodoTypes, useAddTodo, useToggleTodo, useDeleteTodo } from '../hooks/useTodos';
 
 const TodoList = () => {
-    const { getAccessTokenSilently, user } = useAuth0();
-    const queryClient = useQueryClient();
+    const { user } = useAuth0();
     const [newTodoTitle, setNewTodoTitle] = useState('');
     const [selectedTypeId, setSelectedTypeId] = useState<number | ''>('');
 
-    const fetchTodos = async () => {
-        const token = await getAccessTokenSilently();
-        const response = await api.get<Todo[]>('/todos/', {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        return response.data;
-    };
+    const { data: todos, isLoading: isLoadingTodos, error: errorTodos } = useTodos();
+    const { data: todoTypes } = useTodoTypes();
 
-    const fetchTodoTypes = async () => {
-        const token = await getAccessTokenSilently();
-        const response = await api.get<TodoType[]>('/todo-types/', {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        return response.data;
-    };
+    const addTodoMutation = useAddTodo();
+    const toggleTodoMutation = useToggleTodo();
+    const deleteTodoMutation = useDeleteTodo();
 
-    const { data: todos, isLoading: isLoadingTodos, error: errorTodos } = useQuery({
-        queryKey: ['todos'],
-        queryFn: fetchTodos,
-    });
-
-    const { data: todoTypes } = useQuery({
-        queryKey: ['todoTypes'],
-        queryFn: fetchTodoTypes,
-    });
-
-    const addTodoMutation = useMutation({
-        mutationFn: async ({ title, typeId }: { title: string; typeId: number | '' }) => {
-            const token = await getAccessTokenSilently();
-            const payload: any = { title };
-            if (typeId) {
-                payload.todo_type_id = typeId;
+    const handleAddTodo = () => {
+        addTodoMutation.mutate(
+            { title: newTodoTitle, typeId: selectedTypeId },
+            {
+                onSuccess: () => {
+                    setNewTodoTitle('');
+                    setSelectedTypeId('');
+                },
             }
-            return api.post('/todos/', payload, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['todos'] });
-            setNewTodoTitle('');
-            setSelectedTypeId('');
-        },
-    });
-
-    const toggleTodoMutation = useMutation({
-        mutationFn: async (todo: Todo) => {
-            const token = await getAccessTokenSilently();
-            return api.patch(`/todos/${todo.id}/`, { completed: !todo.completed }, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['todos'] });
-        },
-    });
-
-    const deleteTodoMutation = useMutation({
-        mutationFn: async (id: number) => {
-            const token = await getAccessTokenSilently();
-            return api.delete(`/todos/${id}/`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['todos'] });
-        },
-    });
+        );
+    };
 
     if (isLoadingTodos) return <div className="text-center mt-10">Loading...</div>;
     if (errorTodos) return <div className="text-center mt-10 text-red-500">Error loading todos</div>;
@@ -113,13 +48,13 @@ const TodoList = () => {
                             value={newTodoTitle}
                             onChange={(e) => setNewTodoTitle(e.target.value)}
                             placeholder="Add a new todo..."
-                            className="flex-1 border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            onKeyDown={(e) => e.key === 'Enter' && newTodoTitle && addTodoMutation.mutate({ title: newTodoTitle, typeId: selectedTypeId })}
+                            className="cursor-pointer flex-1 border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            onKeyDown={(e) => e.key === 'Enter' && newTodoTitle && handleAddTodo()}
                         />
                         <button
-                            onClick={() => newTodoTitle && addTodoMutation.mutate({ title: newTodoTitle, typeId: selectedTypeId })}
+                            onClick={() => newTodoTitle && handleAddTodo()}
                             disabled={addTodoMutation.isPending}
-                            className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+                            className="cursor-pointer bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
                         >
                             Add
                         </button>
@@ -127,7 +62,7 @@ const TodoList = () => {
                     <select
                         value={selectedTypeId}
                         onChange={(e) => setSelectedTypeId(Number(e.target.value) || '')}
-                        className="border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
+                        className="cursor-pointer border border-gray-300 rounded px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 w-full"
                     >
                         <option value="">Select Type (Optional)</option>
                         {todoTypes?.map((type) => (
@@ -146,7 +81,7 @@ const TodoList = () => {
                                     type="checkbox"
                                     checked={todo.completed}
                                     onChange={() => toggleTodoMutation.mutate(todo)}
-                                    className="h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
+                                    className="cursor-pointer h-5 w-5 text-blue-600 rounded focus:ring-blue-500"
                                 />
                                 <div className="flex flex-col">
                                     <span className={`${todo.completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>
@@ -161,7 +96,7 @@ const TodoList = () => {
                             </div>
                             <button
                                 onClick={() => deleteTodoMutation.mutate(todo.id)}
-                                className="text-red-500 hover:text-red-700"
+                                className="cursor-pointer text-red-500 hover:text-red-700"
                             >
                                 Delete
                             </button>
