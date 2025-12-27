@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth0 } from '@auth0/auth0-react';
 import api from '../api';
+import logger from '../logger';
 import LogoutButton from '../components/LogoutButton';
 
 interface TodoType {
@@ -25,14 +26,17 @@ const TodoList = () => {
     const [selectedTypeId, setSelectedTypeId] = useState<number | ''>('');
 
     const fetchTodos = async () => {
+        logger.debug('Fetching todos');
         const token = await getAccessTokenSilently();
         const response = await api.get<Todo[]>('/todos/', {
             headers: { Authorization: `Bearer ${token}` },
         });
+        logger.info(`Fetched ${response.data.length} todos`);
         return response.data;
     };
 
     const fetchTodoTypes = async () => {
+        logger.debug('Fetching todo types');
         const token = await getAccessTokenSilently();
         const response = await api.get<TodoType[]>('/todo-types/', {
             headers: { Authorization: `Bearer ${token}` },
@@ -52,6 +56,7 @@ const TodoList = () => {
 
     const addTodoMutation = useMutation({
         mutationFn: async ({ title, typeId }: { title: string; typeId: number | '' }) => {
+            logger.info(`Adding new todo: ${title}`);
             const token = await getAccessTokenSilently();
             const payload: any = { title };
             if (typeId) {
@@ -66,10 +71,14 @@ const TodoList = () => {
             setNewTodoTitle('');
             setSelectedTypeId('');
         },
+        onError: (error) => {
+            logger.error('Error adding todo', error);
+        }
     });
 
     const toggleTodoMutation = useMutation({
         mutationFn: async (todo: Todo) => {
+            logger.info(`Toggling todo ${todo.id} to ${!todo.completed}`);
             const token = await getAccessTokenSilently();
             return api.patch(`/todos/${todo.id}/`, { completed: !todo.completed }, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -78,10 +87,14 @@ const TodoList = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['todos'] });
         },
+        onError: (error) => {
+            logger.error('Error toggling todo', error);
+        }
     });
 
     const deleteTodoMutation = useMutation({
         mutationFn: async (id: number) => {
+            logger.info(`Deleting todo ${id}`);
             const token = await getAccessTokenSilently();
             return api.delete(`/todos/${id}/`, {
                 headers: { Authorization: `Bearer ${token}` },
@@ -90,6 +103,9 @@ const TodoList = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['todos'] });
         },
+        onError: (error) => {
+            logger.error('Error deleting todo', error);
+        }
     });
 
     if (isLoadingTodos) return <div className="text-center mt-10">Loading...</div>;

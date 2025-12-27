@@ -7,6 +7,13 @@ import sys
 def main():
     """Run administrative tasks."""
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'todo_project.settings')
+    
+    try:
+        from todo_project.otel import setup_opentelemetry
+        setup_opentelemetry()
+    except ImportError:
+        pass # Ignore if dependencies are missing (e.g. during build)
+
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
