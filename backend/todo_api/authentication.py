@@ -11,23 +11,28 @@ User = get_user_model()
 
 class Auth0JSONWebTokenAuthentication(authentication.BaseAuthentication):
     def authenticate(self, request):
+        token = None
         auth = request.META.get('HTTP_AUTHORIZATION', None)
-        if not auth:
+        
+        if auth:
+            parts = auth.split()
+            if parts[0].lower() != 'bearer':
+                logger.debug("Authorization header must start with Bearer")
+                return None
+            
+            if len(parts) == 1:
+                logger.debug("Invalid header. No credentials provided.")
+                raise exceptions.AuthenticationFailed('Invalid header. No credentials provided.')
+            elif len(parts) > 2:
+                logger.debug("Invalid header. Token string should not contain spaces.")
+                raise exceptions.AuthenticationFailed('Invalid header. Token string should not contain spaces.')
+            
+            token = parts[1]
+        else:
+            token = request.COOKIES.get('access_token')
+
+        if not token:
             return None
-        
-        parts = auth.split()
-        if parts[0].lower() != 'bearer':
-            logger.debug("Authorization header must start with Bearer")
-            return None
-        
-        if len(parts) == 1:
-            logger.debug("Invalid header. No credentials provided.")
-            raise exceptions.AuthenticationFailed('Invalid header. No credentials provided.')
-        elif len(parts) > 2:
-            logger.debug("Invalid header. Token string should not contain spaces.")
-            raise exceptions.AuthenticationFailed('Invalid header. Token string should not contain spaces.')
-        
-        token = parts[1]
         
         try:
             payload = self.verify_token(token)
