@@ -15,6 +15,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Docker Image Name
+        env:
+          DOCKER_USERNAME_SECRET: ${{ secrets.DOCKER_USERNAME }}
+        run: |
+          # Sanitize username to remove potential whitespace/newlines
+          USERNAME=$(echo "$DOCKER_USERNAME_SECRET" | xargs)
+          
+          if [ -z "$USERNAME" ]; then
+            echo "::error::DOCKER_USERNAME secret is missing or empty!"
+            exit 1
+          fi
+          
+          IMAGE_NAME="${USERNAME}/todo-frontend"
+          # Lowercase the image name
+          echo "DOCKER_IMAGE=${IMAGE_NAME,,}" >> $GITHUB_ENV
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -32,7 +48,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/todo-frontend
+          images: ${{ env.DOCKER_IMAGE }}
           tags: |
             type=raw,value=v${{ steps.version.outputs.VERSION }},enable=${{ github.ref == 'refs/heads/main' }}
             type=ref,event=branch
