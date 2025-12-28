@@ -15,6 +15,16 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Debug Secrets
+        run: |
+          if [ -z "${{ secrets.DOCKER_USERNAME }}" ]; then
+            echo "DOCKER_USERNAME is empty or not set!"
+          else
+            echo "DOCKER_USERNAME is set (length: ${#DOCKER_USERNAME})"
+          fi
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
