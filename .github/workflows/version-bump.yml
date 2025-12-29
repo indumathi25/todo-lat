@@ -1,0 +1,48 @@
+name: Version Bump
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+  workflow_dispatch:  
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    # Prevent infinite loops: don't run if the commit was made by the bot
+    if: "!contains(github.event.head_commit.message, 'chore: bump version')"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required to access git history
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump Backend Version
+        id: backend
+        run: |
+          go run scripts/bump_version.go --path backend --file backend/VERSION --type text
+
+      - name: Bump Frontend Version
+        id: frontend
+        run: |
+          go run scripts/bump_version.go --path frontend --file frontend/package.json --type json
+
+      - name: Commit and Push
+        if: steps.backend.outputs.bumped == 'true' || steps.frontend.outputs.bumped == 'true'
+        run: |
+          git add backend/VERSION frontend/package.json
+          git commit -m "chore: bump version"
+          git push
