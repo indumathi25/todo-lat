@@ -1,31 +1,54 @@
-import { useAuth0 } from "@auth0/auth0-react";
-import { useEffect } from "react";
+import { useAuth0 } from '@auth0/auth0-react';
+import { useEffect, useRef } from 'react';
 
 const TokenSync = () => {
-    const { isAuthenticated, isLoading, getAccessTokenSilently } = useAuth0();
+  const { isAuthenticated, isLoading, getAccessTokenSilently } = useAuth0();
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-    useEffect(() => {
-        if (isLoading) return;
+  useEffect(() => {
+    if (isLoading) return;
 
-        const syncToken = async () => {
-            if (isAuthenticated) {
-                try {
-                    const token = await getAccessTokenSilently();
-                    // Set cookie: Secure, SameSite=Strict, Path=/
-                    // Note: 'Secure' might need HTTPS. For localhost, it usually works or we omit it if not serving https.
-                    // Given the user asked for HTTPS secure, we typically set it. 
-                    // But on localhost http, Secure cookies might be rejected by some browsers unless on localhost.
-                    document.cookie = `access_token=${token}; path=/; samesite=strict; secure`;
-                } catch (error) {
-                    console.error("Error setting token cookie:", error);
-                }
-            }
-        };
+    const syncToken = async () => {
+      if (isAuthenticated) {
+        try {
+          const token = await getAccessTokenSilently();
+          document.cookie = `access_token=${token}; path=/; samesite=strict; secure`;
+          console.log('Token refreshed successfully');
+        } catch (error) {
+          console.error('Error setting token cookie:', error);
+          // If token refresh fails, try to get a new one
+          try {
+            const token = await getAccessTokenSilently({ cacheMode: 'off' });
+            document.cookie = `access_token=${token}; path=/; samesite=strict; secure`;
+          } catch (retryError) {
+            console.error('Failed to refresh token, user may need to re-login:', retryError);
+          }
+        }
+      }
+    };
 
-        syncToken();
-    }, [isAuthenticated, isLoading, getAccessTokenSilently]);
+    // Initial sync
+    syncToken();
 
-    return null;
+    // Refresh token every 30 minutes
+    if (isAuthenticated) {
+      refreshIntervalRef.current = setInterval(
+        () => {
+          syncToken();
+        },
+        30 * 60 * 1000
+      ); // 30 minutes
+    }
+
+    // Cleanup interval on unmount
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [isAuthenticated, isLoading, getAccessTokenSilently]);
+
+  return null;
 };
 
 export default TokenSync;
