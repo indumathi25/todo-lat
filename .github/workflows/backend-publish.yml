@@ -1,11 +1,14 @@
 name: Backend Build & Publish
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'backend/**'
+  workflow_call:
+    inputs:
+      ref:
+        required: true
+        type: string
+      version:
+        required: false
+        type: string
   workflow_dispatch:
 
 jobs:
@@ -14,6 +17,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Setup Docker Image Name
         env:
@@ -42,7 +47,12 @@ jobs:
 
       - name: Read version
         id: version
-        run: echo "VERSION=$(cat backend/VERSION | xargs)" >> $GITHUB_OUTPUT
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=$(cat backend/VERSION | xargs)" >> $GITHUB_OUTPUT
+          fi
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -50,7 +60,7 @@ jobs:
         with:
           images: ${{ env.DOCKER_IMAGE }}
           tags: |
-            type=raw,value=v${{ steps.version.outputs.VERSION }},enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=v${{ steps.version.outputs.VERSION }}
             type=ref,event=branch
             type=sha
 

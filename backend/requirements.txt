@@ -13,3 +13,5 @@ opentelemetry-sdk
 opentelemetry-instrumentation-django
 opentelemetry-instrumentation-psycopg2
 opentelemetry-exporter-otlp
+# test
+# test done
