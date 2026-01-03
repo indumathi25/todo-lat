@@ -14,6 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     # Prevent infinite loops: don't run if the commit was made by the bot
     if: "!contains(github.event.head_commit.message, 'chore: bump version')"
+    outputs:
+      backend_bumped: ${{ steps.backend.outputs.bumped }}
+      frontend_bumped: ${{ steps.frontend.outputs.bumped }}
+      new_sha: ${{ steps.commit.outputs.sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -41,8 +45,26 @@ jobs:
           go run scripts/bump_version.go --path frontend --file frontend/package.json --type json
 
       - name: Commit and Push
+        id: commit
         if: steps.backend.outputs.bumped == 'true' || steps.frontend.outputs.bumped == 'true'
         run: |
           git add backend/VERSION frontend/package.json
           git commit -m "chore: bump version"
           git push
+          echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
+  publish-backend:
+    needs: bump-version
+    if: needs.bump-version.outputs.backend_bumped == 'true'
+    uses: ./.github/workflows/backend-publish.yml
+    with:
+      ref: ${{ needs.bump-version.outputs.new_sha }}
+    secrets: inherit
+
+  publish-frontend:
+    needs: bump-version
+    if: needs.bump-version.outputs.frontend_bumped == 'true'
+    uses: ./.github/workflows/frontend-publish.yml
+    with:
+      ref: ${{ needs.bump-version.outputs.new_sha }}
+    secrets: inherit
