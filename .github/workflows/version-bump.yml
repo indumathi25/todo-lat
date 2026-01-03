@@ -17,7 +17,9 @@ jobs:
     outputs:
       backend_bumped: ${{ steps.backend.outputs.bumped }}
       frontend_bumped: ${{ steps.frontend.outputs.bumped }}
-      new_sha: ${{ steps.commit.outputs.sha }}
+      backend_version: ${{ steps.backend.outputs.new_version }}
+      frontend_version: ${{ steps.frontend.outputs.new_version }}
+      new_sha: ${{ steps.commit.outputs.sha || github.sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -37,20 +39,38 @@ jobs:
       - name: Bump Backend Version
         id: backend
         run: |
-          go run scripts/bump_version.go --path backend --file backend/VERSION --type text
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            go run scripts/bump_version.go --path backend --file backend/VERSION --type text
+          else
+            # Feature branch: Dry run and append prerelease tag
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            SAFE_BRANCH=$(echo "${{ github.ref_name }}" | tr / - | tr -cd '[:alnum:]-')
+            SUFFIX="-${SAFE_BRANCH}.${SHORT_SHA}"
+            
+            go run scripts/bump_version.go --path backend --file backend/VERSION --type text --dry-run --prerelease-suffix "$SUFFIX"
+          fi
 
       - name: Bump Frontend Version
         id: frontend
         run: |
-          go run scripts/bump_version.go --path frontend --file frontend/package.json --type json
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            go run scripts/bump_version.go --path frontend --file frontend/package.json --type json
+          else
+            # Feature branch: Dry run and append prerelease tag
+            SHORT_SHA=$(git rev-parse --short HEAD)
+            SAFE_BRANCH=$(echo "${{ github.ref_name }}" | tr / - | tr -cd '[:alnum:]-')
+            SUFFIX="-${SAFE_BRANCH}.${SHORT_SHA}"
+            
+            go run scripts/bump_version.go --path frontend --file frontend/package.json --type json --dry-run --prerelease-suffix "$SUFFIX"
+          fi
 
       - name: Commit and Push
         id: commit
-        if: steps.backend.outputs.bumped == 'true' || steps.frontend.outputs.bumped == 'true'
+        if: (steps.backend.outputs.bumped == 'true' || steps.frontend.outputs.bumped == 'true') && github.ref == 'refs/heads/main'
         run: |
           git add backend/VERSION frontend/package.json
           git commit -m "chore: bump version"
-          git push
+          git push origin HEAD:${{ github.ref }}
           echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
 
   publish-backend:
@@ -59,6 +79,7 @@ jobs:
     uses: ./.github/workflows/backend-publish.yml
     with:
       ref: ${{ needs.bump-version.outputs.new_sha }}
+      version: ${{ needs.bump-version.outputs.backend_version }}
     secrets: inherit
 
   publish-frontend:
@@ -67,4 +88,5 @@ jobs:
     uses: ./.github/workflows/frontend-publish.yml
     with:
       ref: ${{ needs.bump-version.outputs.new_sha }}
+      version: ${{ needs.bump-version.outputs.frontend_version }}
     secrets: inherit

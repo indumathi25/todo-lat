@@ -6,6 +6,9 @@ on:
       ref:
         required: true
         type: string
+      version:
+        required: false
+        type: string
   workflow_dispatch:
 
 jobs:
@@ -44,7 +47,12 @@ jobs:
 
       - name: Read version
         id: version
-        run: echo "VERSION=$(jq -r .version frontend/package.json)" >> $GITHUB_OUTPUT
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=$(jq -r .version frontend/package.json)" >> $GITHUB_OUTPUT
+          fi
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -52,7 +60,7 @@ jobs:
         with:
           images: ${{ env.DOCKER_IMAGE }}
           tags: |
-            type=raw,value=v${{ steps.version.outputs.VERSION }},enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=v${{ steps.version.outputs.VERSION }}
             type=ref,event=branch
             type=sha
 

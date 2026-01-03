@@ -85,11 +85,13 @@ func main() {
 	pathPtr := flag.String("path", "", "Path to check for changes")
 	filePtr := flag.String("file", "", "Version file to update")
 	typePtr := flag.String("type", "", "Type of version file (text or json)")
+	dryRunPtr := flag.Bool("dry-run", false, "Calculate version but do not write to file")
+	prereleaseSuffixPtr := flag.String("prerelease-suffix", "", "Suffix to append to the new version (e.g., -beta.1)")
 
 	flag.Parse()
 
 	if *pathPtr == "" || *filePtr == "" || *typePtr == "" {
-		fmt.Println("Usage: go run bump_version.go --path <path> --file <file> --type <text|json>")
+		fmt.Println("Usage: go run bump_version.go --path <path> --file <file> --type <text|json> [--dry-run] [--prerelease-suffix <suffix>]")
 		os.Exit(1)
 	}
 
@@ -131,23 +133,30 @@ func main() {
 	}
 
 	newVersion := incrementVersion(currentVersion, bumpType)
+	if *prereleaseSuffixPtr != "" {
+		newVersion = newVersion + *prereleaseSuffixPtr
+	}
 	fmt.Printf("Bumping version: %s -> %s\n", currentVersion, newVersion)
 
-	if *typePtr == "text" {
-		if err := os.WriteFile(*filePtr, []byte(newVersion), 0644); err != nil {
-			panic(err)
+	if !*dryRunPtr {
+		if *typePtr == "text" {
+			if err := os.WriteFile(*filePtr, []byte(newVersion), 0644); err != nil {
+				panic(err)
+			}
+		} else if *typePtr == "json" {
+			jsonData["version"] = newVersion
+			content, err := json.MarshalIndent(jsonData, "", "  ")
+			if err != nil {
+				panic(err)
+			}
+			// Add newline at end of file
+			content = append(content, '\n')
+			if err := os.WriteFile(*filePtr, content, 0644); err != nil {
+				panic(err)
+			}
 		}
-	} else if *typePtr == "json" {
-		jsonData["version"] = newVersion
-		content, err := json.MarshalIndent(jsonData, "", "  ")
-		if err != nil {
-			panic(err)
-		}
-		// Add newline at end of file
-		content = append(content, '\n')
-		if err := os.WriteFile(*filePtr, content, 0644); err != nil {
-			panic(err)
-		}
+	} else {
+		fmt.Println("Dry run: Skipping file write.")
 	}
 
 	// Output for GitHub Actions
