@@ -18,11 +18,10 @@ jobs:
     # Prevent infinite loops: don't run if the commit was made by the bot
     if: "!contains(github.event.head_commit.message, 'chore: bump version')"
     outputs:
-      backend_bumped: ${{ steps.backend.outputs.bumped }}
-      frontend_bumped: ${{ steps.frontend.outputs.bumped }}
-      backend_version: ${{ steps.backend.outputs.new_version }}
-      frontend_version: ${{ steps.frontend.outputs.new_version }}
-      new_sha: ${{ steps.commit.outputs.sha || github.sha }}
+      bumped: ${{ steps.bump.outputs.bumped }}
+      version: ${{ steps.bump.outputs.new_version }}
+      tag: ${{ steps.bump.outputs.new_tag }}
+      new_sha: ${{ github.sha }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,57 +38,40 @@ jobs:
           git config user.name "velann21"
           git config user.email "velann21@gmail.com"
 
-      - name: Bump Backend Version
-        id: backend
+      - name: Bump Version
+        id: bump
         run: |
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            go run scripts/bump_version.go --path backend --file backend/VERSION --type text
+            go run scripts/bump_version.go --path . --tag-prefix v
           else
             # Feature branch: Dry run and append prerelease tag
             SHORT_SHA=$(git rev-parse --short HEAD)
             SAFE_BRANCH=$(echo "${{ github.ref_name }}" | tr / - | tr -cd '[:alnum:]-')
             SUFFIX="-${SAFE_BRANCH}.${SHORT_SHA}"
             
-            go run scripts/bump_version.go --path backend --file backend/VERSION --type text --dry-run --prerelease-suffix "$SUFFIX"
+            go run scripts/bump_version.go --path . --tag-prefix v --dry-run --prerelease-suffix "$SUFFIX"
           fi
 
-      - name: Bump Frontend Version
-        id: frontend
+      - name: Push Tag
+        if: steps.bump.outputs.bumped == 'true' && github.ref == 'refs/heads/main'
         run: |
-          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
-            go run scripts/bump_version.go --path frontend --file frontend/package.json --type json
-          else
-            # Feature branch: Dry run and append prerelease tag
-            SHORT_SHA=$(git rev-parse --short HEAD)
-            SAFE_BRANCH=$(echo "${{ github.ref_name }}" | tr / - | tr -cd '[:alnum:]-')
-            SUFFIX="-${SAFE_BRANCH}.${SHORT_SHA}"
-            
-            go run scripts/bump_version.go --path frontend --file frontend/package.json --type json --dry-run --prerelease-suffix "$SUFFIX"
-          fi
-
-      - name: Commit and Push
-        id: commit
-        if: (steps.backend.outputs.bumped == 'true' || steps.frontend.outputs.bumped == 'true') && github.ref == 'refs/heads/main'
-        run: |
-          git add backend/VERSION frontend/package.json
-          git commit -m "chore: bump version"
-          git push origin HEAD:${{ github.ref }}
-          echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          git tag ${{ steps.bump.outputs.new_tag }}
+          git push origin ${{ steps.bump.outputs.new_tag }}
 
   publish-backend:
     needs: bump-version
-    if: needs.bump-version.outputs.backend_bumped == 'true'
+    if: needs.bump-version.outputs.bumped == 'true'
     uses: ./.github/workflows/backend-publish.yml
     with:
       ref: ${{ needs.bump-version.outputs.new_sha }}
-      version: ${{ needs.bump-version.outputs.backend_version }}
+      version: ${{ needs.bump-version.outputs.version }}
     secrets: inherit
 
   publish-frontend:
     needs: bump-version
-    if: needs.bump-version.outputs.frontend_bumped == 'true'
+    if: needs.bump-version.outputs.bumped == 'true'
     uses: ./.github/workflows/frontend-publish.yml
     with:
       ref: ${{ needs.bump-version.outputs.new_sha }}
-      version: ${{ needs.bump-version.outputs.frontend_version }}
+      version: ${{ needs.bump-version.outputs.version }}
     secrets: inherit
