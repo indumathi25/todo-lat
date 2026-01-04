@@ -10,7 +10,7 @@ echo "Pushing changes to origin..."
 # Push to origin, setting upstream if needed
 git push -u origin "$BRANCH"
 
-echo "Running act..."
+echo "Running act..."r
 # Run act with workflow_dispatch, passing secrets and simulating the current branch
 act workflow_dispatch \
   -W .github/workflows/version-bump.yml \

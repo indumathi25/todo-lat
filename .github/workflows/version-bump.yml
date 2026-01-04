@@ -33,10 +33,10 @@ jobs:
         with:
           go-version: '1.21'
 
-      - name: Configure Git
+      - name: Configure Git 
         run: |
-          git config user.name "velann21"
-          git config user.email "velann21@gmail.com"
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
 
       - name: Bump Version
         id: bump

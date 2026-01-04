@@ -36,7 +36,9 @@ services:
 
   frontend:
     image: todo-frontend:${TAG:-latest}
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: development
     volumes:
       - ./frontend:/app
       - /app/node_modules
