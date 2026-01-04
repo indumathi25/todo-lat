@@ -68,7 +68,7 @@ jobs:
     secrets: inherit
 
   publish-frontend:
-    needs: bump-version
+    needs: [bump-version, publish-backend]
     if: needs.bump-version.outputs.bumped == 'true'
     uses: ./.github/workflows/frontend-publish.yml
     with:
